@@ -31,15 +31,15 @@ const Header = async () =>  {
           </SignedOut>
 
           <SignedIn>
-            <Link href={"/dashboard"} className="text-blue-800 hover:text-black flex items-center gap-2">
-              <Button variant="outline" className="flex items-center gap-2 border-blue-600 hover:border-blue-800">
+            <Link href={"/dashboard"} className="flex items-center gap-2">
+              <Button className="flex items-center gap-2 bg-blue-900 hover:bg-blue-600">
                 <LayoutDashboard size={18} />
                 <span className="hidden md:inline">Dashboard</span>
               </Button>
             </Link>
 
-            <Link href={"/transaction/create"} className="text-blue-800 hover:text-black flex items-center gap-2">
-              <Button variant="outline" className="flex items-center gap-2 border-blue-600 hover:border-blue-800">
+            <Link href={"/transaction/create"} className="text-blue-800 flex items-center gap-2">
+              <Button variant="outline" className="flex items-center gap-2 hover:bg-blue-600 hover:text-white">
                 <PenBox size={18} />
                 <span className="hidden md:inline">Add Transaction</span>
               </Button>
