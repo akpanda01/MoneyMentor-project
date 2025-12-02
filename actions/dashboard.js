@@ -89,18 +89,24 @@ export async function getUserAccounts() {
     throw new Error("User not found");
   }
 
-  const accounts = await db.account.findMany({
-    where: { userId: user.id },
-    orderBy: { createdAt: "desc" },
-    include: {
+  try {
+    const accounts = await db.account.findMany({
+      where: { userId: user.id },
+      orderBy: { createdAt: "desc" },
+      include: {
         _count: {
-        select: {
+          select: {
             transactions: true,
+          },
         },
-        },
-    },
+      },
     });
-    const serializedAccount = accounts.map(serializeTransaction);
-    return serializedAccount;
 
+    // Serialize accounts before sending to client
+    const serializedAccounts = accounts.map(serializeTransaction);
+
+    return serializedAccounts;
+  } catch (error) {
+    console.error(error.message);
+  }
 }
