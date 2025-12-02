@@ -39,12 +39,10 @@ export function AccountChart({ transactions }) {
       ? startOfDay(subDays(now, range.days))
       : startOfDay(new Date(0));
 
-    // Filter transactions within date range
     const filtered = transactions.filter(
       (t) => new Date(t.date) >= startDate && new Date(t.date) <= endOfDay(now)
     );
 
-    // Group transactions by date
     const grouped = filtered.reduce((acc, transaction) => {
       const date = format(new Date(transaction.date), "MMM dd");
       if (!acc[date]) {
@@ -58,13 +56,11 @@ export function AccountChart({ transactions }) {
       return acc;
     }, {});
 
-    // Convert to array and sort by date
     return Object.values(grouped).sort(
       (a, b) => new Date(a.date) - new Date(b.date)
     );
   }, [transactions, dateRange]);
 
-  // Calculate totals for the selected period
   const totals = useMemo(() => {
     return filteredData.reduce(
       (acc, day) => ({
@@ -81,6 +77,7 @@ export function AccountChart({ transactions }) {
         <CardTitle className="text-base font-normal">
           Transaction Overview
         </CardTitle>
+
         <Select defaultValue={dateRange} onValueChange={setDateRange}>
           <SelectTrigger className="w-[140px]">
             <SelectValue placeholder="Select range" />
@@ -94,7 +91,9 @@ export function AccountChart({ transactions }) {
           </SelectContent>
         </Select>
       </CardHeader>
+
       <CardContent>
+        {/* Totals Header */}
         <div className="flex justify-around mb-6 text-sm">
           <div className="text-center">
             <p className="text-muted-foreground">Total Income</p>
@@ -121,6 +120,8 @@ export function AccountChart({ transactions }) {
             </p>
           </div>
         </div>
+
+        {/* Chart */}
         <div className="h-[300px]">
           <ResponsiveContainer width="100%" height="100%">
             <BarChart
@@ -138,10 +139,11 @@ export function AccountChart({ transactions }) {
                 fontSize={12}
                 tickLine={false}
                 axisLine={false}
-                tickFormatter={(value) => `$${value}`}
+                tickFormatter={(value) => `₹${value}`}
               />
               <Tooltip
-                formatter={(value) => [`$${value}`, undefined]}
+                formatter={(value) => [`₹${value}`, undefined]}
+                labelStyle={{ color: "hsl(var(--foreground))" }}
                 contentStyle={{
                   backgroundColor: "hsl(var(--popover))",
                   border: "1px solid hsl(var(--border))",

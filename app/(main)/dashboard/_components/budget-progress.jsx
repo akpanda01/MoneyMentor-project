@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Pencil, Check, X } from "lucide-react";
+import { Pencil, Check, X, Loader2 } from "lucide-react";
 import useFetch from "@/hooks/use-fetch";
 import { toast } from "sonner";
 
@@ -17,22 +17,38 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { updateBudget } from "@/actions/budget";
 
+/**
+ * BudgetProgress - corrected and hardened
+ *
+ * Fixes and improvements:
+ * - removed duplicate/unused imports
+ * - synced `newBudget` when `initialBudget` changes
+ * - defensive parsing for Decimal/number/string budget shapes
+ * - safe percent computation and clamping
+ * - accessible labels and tooltips for buttons
+ * - shows loading spinner when saving
+ */
+
 export function BudgetProgress({ initialBudget, currentExpenses = 0 }) {
   const [isEditing, setIsEditing] = useState(false);
 
-  // Keep as string for controlled numeric input; initialize defensively
-  const initialAmount = (() => {
-    if (!initialBudget) return "";
-    // handle Prisma Decimal or number or string
+  // Defensive extraction of numeric initial amount (handles Prisma Decimal objects)
+  const getInitialAmountString = (budget) => {
+    if (!budget) return "";
     const amt =
-      typeof initialBudget.amount === "object" &&
-      typeof initialBudget.amount.toNumber === "function"
-        ? initialBudget.amount.toNumber()
-        : Number(initialBudget.amount);
+      typeof budget.amount === "object" &&
+      typeof budget.amount.toNumber === "function"
+        ? budget.amount.toNumber()
+        : Number(budget.amount);
     return Number.isFinite(amt) ? String(amt) : "";
-  })();
+  };
 
-  const [newBudget, setNewBudget] = useState(initialAmount);
+  const [newBudget, setNewBudget] = useState(getInitialAmountString(initialBudget));
+
+  // Keep controlled input in sync when initialBudget prop updates
+  useEffect(() => {
+    setNewBudget(getInitialAmountString(initialBudget));
+  }, [initialBudget]);
 
   const {
     loading: isLoading,
@@ -41,18 +57,34 @@ export function BudgetProgress({ initialBudget, currentExpenses = 0 }) {
     error,
   } = useFetch(updateBudget);
 
-  // compute percentUsed defensively and clamp 0..100
+  // Numeric budget used for percent calculations
   const budgetNumber =
     typeof initialBudget?.amount === "object" &&
     typeof initialBudget?.amount.toNumber === "function"
       ? initialBudget.amount.toNumber()
       : Number(initialBudget?.amount ?? 0);
 
+  // safe percent calculation clamped to [0, 100]
   let rawPercent =
     budgetNumber > 0 ? (Number(currentExpenses || 0) / budgetNumber) * 100 : 0;
-  // guard against NaN / Infinity
   if (!Number.isFinite(rawPercent) || Number.isNaN(rawPercent)) rawPercent = 0;
   const percentUsed = Math.max(0, Math.min(100, rawPercent));
+
+  // Currency formatting with fallback
+  const formatCurrency = (val) => {
+    try {
+      return new Intl.NumberFormat("en-IN", {
+        style: "currency",
+        currency: "INR",
+        maximumFractionDigits: 2,
+      }).format(Number(val || 0));
+    } catch {
+      return `₹${Number(val || 0).toFixed(2)}`;
+    }
+  };
+
+  const progressColorClass =
+    percentUsed >= 90 ? "bg-red-500" : percentUsed >= 75 ? "bg-amber-500" : "bg-emerald-500";
 
   const handleUpdateBudget = async () => {
     const amount = parseFloat(newBudget);
@@ -63,17 +95,19 @@ export function BudgetProgress({ initialBudget, currentExpenses = 0 }) {
 
     try {
       await updateBudgetFn(amount);
+      // optimistic UX: keep editing off if update succeeded via hook response
+      // updatedBudget useEffect below will also show toast and close edit mode
     } catch (err) {
-      // useFetch likely surfaces error via `error` but keep try/catch for safety
       toast.error(err?.message || "Failed to update budget");
     }
   };
 
   const handleCancel = () => {
-    setNewBudget(initialAmount);
+    setNewBudget(getInitialAmountString(initialBudget));
     setIsEditing(false);
   };
 
+  // react to hook response
   useEffect(() => {
     if (updatedBudget?.success) {
       setIsEditing(false);
@@ -81,29 +115,30 @@ export function BudgetProgress({ initialBudget, currentExpenses = 0 }) {
     }
   }, [updatedBudget]);
 
+  // show errors surfaced by the hook
   useEffect(() => {
     if (error) {
-      // error might be string or Error
       toast.error(error?.message || String(error));
     }
   }, [error]);
 
   return (
     <Card>
-      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-        <div className="flex-1">
-          <CardTitle className="text-sm font-medium">
+      <CardHeader className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 pb-2">
+        <div className="flex-1 min-w-0">
+          <CardTitle className="text-sm font-semibold">
             Monthly Budget (Default Account)
           </CardTitle>
-          <div className="flex items-center gap-2 mt-1">
+
+          <div className="flex items-center gap-3 mt-1">
             {isEditing ? (
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 w-full sm:w-auto">
                 <Input
                   type="number"
                   value={newBudget}
                   onChange={(e) => setNewBudget(e.target.value)}
-                  className="w-32"
-                  placeholder="Enter amount"
+                  className="w-36 font-medium text-sm"
+                  placeholder="Amount"
                   autoFocus
                   disabled={isLoading}
                   aria-label="Budget amount"
@@ -115,8 +150,13 @@ export function BudgetProgress({ initialBudget, currentExpenses = 0 }) {
                   onClick={handleUpdateBudget}
                   disabled={isLoading}
                   aria-label="Save budget"
+                  title="Save"
                 >
-                  <Check className="h-4 w-4 text-green-500" />
+                  {isLoading ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Check className="h-4 w-4" />
+                  )}
                 </Button>
                 <Button
                   type="button"
@@ -125,28 +165,29 @@ export function BudgetProgress({ initialBudget, currentExpenses = 0 }) {
                   onClick={handleCancel}
                   disabled={isLoading}
                   aria-label="Cancel edit"
+                  title="Cancel"
                 >
-                  <X className="h-4 w-4 text-red-500" />
+                  <X className="h-4 w-4" />
                 </Button>
               </div>
             ) : (
               <>
-                <CardDescription>
+                <CardDescription className="text-sm">
                   {initialBudget
-                    ? `$${Number(currentExpenses || 0).toFixed(
-                        2
-                      )} of $${Number(budgetNumber).toFixed(2)} spent`
+                    ? `${formatCurrency(currentExpenses)} of ${formatCurrency(budgetNumber)} spent`
                     : "No budget set"}
                 </CardDescription>
+
                 <Button
                   type="button"
                   variant="ghost"
                   size="icon"
                   onClick={() => setIsEditing(true)}
-                  className="h-6 w-6"
+                  className="h-7 w-7 ml-1"
                   aria-label="Edit budget"
+                  title="Edit budget"
                 >
-                  <Pencil className="h-3 w-3" />
+                  <Pencil className="h-4 w-4" />
                 </Button>
               </>
             )}
@@ -157,20 +198,22 @@ export function BudgetProgress({ initialBudget, currentExpenses = 0 }) {
       <CardContent>
         {initialBudget ? (
           <div className="space-y-2">
-            {/* Pass percentUsed value and use className to style the track/fill */}
-            <Progress
-              value={percentUsed}
-              className={`h-2 rounded-full ${
-                percentUsed >= 90
-                  ? "bg-red-500"
-                  : percentUsed >= 75
-                  ? "bg-yellow-500"
-                  : "bg-green-500"
-              }`}
-            />
-            <p className="text-xs text-muted-foreground text-right">
-              {percentUsed.toFixed(1)}% used
-            </p>
+            <div className="flex items-center justify-between gap-2" aria-hidden={false}>
+              <div className="text-xs text-muted-foreground truncate">
+                {percentUsed < 100
+                  ? `You have ${formatCurrency(Math.max(0, budgetNumber - currentExpenses))} remaining`
+                  : "You've reached or exceeded your budget"}
+              </div>
+              <div className="text-xs font-medium tabular-nums">{percentUsed.toFixed(1)}%</div>
+            </div>
+
+            <div className="w-full bg-muted h-3 rounded-full overflow-hidden">
+              <Progress
+                value={percentUsed}
+                className={`h-3 rounded-full ${progressColorClass}`}
+                aria-label={`Budget usage ${percentUsed.toFixed(1)} percent`}
+              />
+            </div>
           </div>
         ) : (
           <div className="text-sm text-muted-foreground">No budget set</div>

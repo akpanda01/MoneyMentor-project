@@ -32,7 +32,6 @@ const COLORS = [
   "#94a3b8",
 ];
 
-/** safely convert amount (handles Prisma Decimal or number/string) */
 const toNumber = (v) =>
   v != null && typeof v === "object" && typeof v.toNumber === "function"
     ? v.toNumber()

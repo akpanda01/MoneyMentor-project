@@ -170,4 +170,4 @@ const CreateAccountDrawer = ({ children }) => {
   );
 }
 
-export default CreateAccountDrawer
+export default CreateAccountDrawer;
