@@ -257,15 +257,24 @@ export async function scanReceipt(file) {
       If its not a recipt, return an empty object
     `;
 
-    const result = await model.generateContent([
-      {
-        inlineData: {
-          data: base64String,
-          mimeType: file.type,
+    const result = await model.generateContent({
+      contents: [
+        {
+          role: "user",
+          parts: [
+            {
+              inlineData: {
+                data: base64String,
+                mimeType: file.type,
+              },
+            },
+            {
+              text: prompt,
+            },
+          ],
         },
-      },
-      prompt,
-    ]);
+      ],
+    });
 
     const response = await result.response;
     const text = response.text();
